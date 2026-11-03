@@ -113,7 +113,12 @@ async function managedDevelopmentRepository(
   if (row.provider !== 'github' && row.provider !== 'gitlab')
     throw new HttpError(400, 'Creating and linking pull requests supports GitHub and GitLab');
   return {
-    input: { provider: row.provider, baseUrl: row.baseUrl, token: decryptSecret(row) },
+    input: {
+      provider: row.provider,
+      baseUrl: row.baseUrl,
+      token: decryptSecret(row),
+      authType: 'token',
+    },
     repository: {
       externalId: row.externalId,
       fullName: row.fullName,
@@ -297,6 +302,7 @@ function providerInput(connection: ConnectionSecret): ProviderConnectionInput {
     provider: connection.provider,
     baseUrl: connection.baseUrl,
     token: connection.token,
+    authType: 'token',
   };
 }
 
@@ -307,7 +313,12 @@ export async function connectGitProvider(
   const token = input.token.trim();
   if (!token) throw new HttpError(400, 'token is required');
   const baseUrl = await normalizeProviderBaseUrl(input.provider, input.baseUrl);
-  const accountLogin = await getProviderAccount({ provider: input.provider, baseUrl, token });
+  const accountLogin = await getProviderAccount({
+    provider: input.provider,
+    baseUrl,
+    token,
+    authType: 'token',
+  });
   const encrypted = encryptSecret(token);
   // A team can hold several connections of one account: the migration from
   // project-owned connections keeps each project's token. Saving the account
@@ -333,7 +344,12 @@ export async function connectGitProvider(
   const connectionId = rows[0]?.id;
   if (!connectionId) throw new HttpError(500, 'Provider connection was not stored');
   for (const row of rows) {
-    await reconcileConnectionWebhooks(row.id, { provider: input.provider, baseUrl, token });
+    await reconcileConnectionWebhooks(row.id, {
+      provider: input.provider,
+      baseUrl,
+      token,
+      authType: 'token',
+    });
   }
   const connections = await listTeamGitProviderConnections(teamId);
   const connection = connections.find((item) => item.id === connectionId);
@@ -582,6 +598,7 @@ export async function postPullRequestLinkback(
       provider,
       baseUrl: row.baseUrl,
       token: decryptSecret(row),
+      authType: 'token',
     },
     {
       externalId: row.externalId,
