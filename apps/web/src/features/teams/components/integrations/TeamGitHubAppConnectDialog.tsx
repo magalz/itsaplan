@@ -11,9 +11,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useConnectGithubApp } from '@/services/gitConnections.service';
 import { GIT_PROVIDER_CONFIG } from '@/utils/gitProviderConfig';
+import TeamGitHubAppKeyField from './TeamGitHubAppKeyField';
 
 const EMPTY_FORM = {
   baseUrl: GIT_PROVIDER_CONFIG.github.defaultBaseUrl,
@@ -88,21 +88,12 @@ export default function TeamGitHubAppConnectDialog({
             />
             <p className="text-xs text-muted-foreground">{t('nativeInstallationIdHint')}</p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="github-app-key">{t('nativePrivateKey')}</Label>
-            <Textarea
-              id="github-app-key"
-              rows={6}
-              dir="ltr"
-              spellCheck={false}
-              autoComplete="off"
-              className="font-mono text-xs"
-              value={privateKey}
-              onChange={(event) => setForm({ ...form, privateKey: event.target.value })}
-              required
-            />
-            <p className="text-xs text-muted-foreground">{t('nativePrivateKeyHint')}</p>
-          </div>
+          <TeamGitHubAppKeyField
+            key={String(open)}
+            id="github-app-key"
+            value={privateKey}
+            onChange={(key) => setForm((current) => ({ ...current, privateKey: key }))}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('nativeCancel')}

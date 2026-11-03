@@ -453,7 +453,6 @@
     "nativeInstallationId": "Installation ID",
     "nativeInstallationIdHint": "The number at the end of the address of the installation's settings page on GitHub.",
     "nativePrivateKey": "Private key",
-    "nativePrivateKeyHint": "Paste the whole .pem file, including the BEGIN and END lines. The key is encrypted at rest and is never returned by the API.",
     "nativePrivateKeyChooseFile": "Choose .pem file",
     "nativePrivateKeyLoaded": "{name} loaded",
     "nativePrivateKeyPasteInstead": "Paste the key instead",

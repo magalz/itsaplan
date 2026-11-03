@@ -49,10 +49,13 @@ This works with github.com and with GitHub Enterprise Server.
    managers see this page.
 2. Leave the provider URL as `https://github.com`, or enter the address of your GitHub
    Enterprise Server.
-3. Enter the App ID (or Client ID) and the Installation ID, and paste the whole content of the
-   `.pem` file, including the `BEGIN` and `END` lines.
+3. Enter the App ID (or Client ID) and the Installation ID, then click **Choose .pem file** and
+   select the file GitHub downloaded. Plan shows only the file name, never the key. If you keep
+   the key in a password manager instead, click **Paste the key instead** and paste the whole
+   content of the key, including the `BEGIN` and `END` lines.
 4. Click **Connect**. Plan checks the key and the installation with GitHub before it saves
    anything.
+5. Delete the `.pem` file from your computer. Plan keeps the key encrypted and never returns it.
 
 The connection is listed as **GitHub App**, with the account the App is installed on. In each
 project, **Settings → Git** then lists the repositories of the installation, and Plan creates
