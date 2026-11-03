@@ -35,6 +35,7 @@ function fakeGithub(options: FakeOptions = {}) {
   const installationId = String(++installations);
   const expiresIn = [...(options.expiresIn ?? [])];
   let mints = 0;
+  let failuresLeft = options.failMints ?? 0;
 
   const server = Bun.serve({
     port: 0,
@@ -61,7 +62,8 @@ function fakeGithub(options: FakeOptions = {}) {
       if (path === `${installation}/access_tokens` && req.method === 'POST') {
         mints += 1;
         await Bun.sleep(20);
-        if (mints <= (options.failMints ?? 0)) {
+        if (failuresLeft > 0) {
+          failuresLeft -= 1;
           return Response.json({ message: 'Server Error' }, { status: options.mintStatus ?? 500 });
         }
         const seconds = expiresIn.shift() ?? 3600;
@@ -80,6 +82,9 @@ function fakeGithub(options: FakeOptions = {}) {
     seen,
     installationId,
     mints: () => mints,
+    failNextMints: (count: number) => {
+      failuresLeft = count;
+    },
     app: (overrides: Partial<GithubAppCredentials> = {}): GithubAppCredentials => ({
       apiBase: `http://127.0.0.1:${server.port}${PREFIX}`,
       appId: APP_ID,
@@ -297,6 +302,19 @@ describe('GitHub App credentials', () => {
       expect(await githubInstallationToken(app)).toBe('ghs_1');
       expect(await githubInstallationToken(app, { fresh: true })).toBe('ghs_2');
       expect(await githubInstallationToken(app)).toBe('ghs_2');
+      expect(github.mints()).toBe(2);
+    });
+
+    it('keeps the cached token when a new one cannot be minted', async () => {
+      const github = serve({ mintStatus: 403 });
+      const app = github.app();
+      expect(await githubInstallationToken(app)).toBe('ghs_1');
+      github.failNextMints(1);
+
+      const error = await rejection(githubInstallationToken(app, { fresh: true }));
+
+      expect(error.status).toBe(400);
+      expect(await githubInstallationToken(app)).toBe('ghs_1');
       expect(github.mints()).toBe(2);
     });
   });

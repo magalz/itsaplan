@@ -137,12 +137,14 @@ export async function githubInstallationToken(
   // Hashed into the key so only a caller holding the private key is served a cached token.
   const keyHash = createHash('sha256').update(app.privateKey).digest('hex');
   const key = `${app.apiBase}|${app.appId}|${app.installationId}|${keyHash}`;
+  if (fresh) {
+    // Cached only once minted, so a failed fresh mint leaves the cached token to other callers.
+    const minted = await mintInstallationToken(app);
+    tokenCache.set(key, { promise: Promise.resolve(minted), minted });
+    return minted.token;
+  }
   const cached = tokenCache.get(key);
-  if (
-    !fresh &&
-    cached &&
-    (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)
-  ) {
+  if (cached && (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)) {
     return (await cached.promise).token;
   }
   const entry: CachedToken = { promise: mintInstallationToken(app) };
