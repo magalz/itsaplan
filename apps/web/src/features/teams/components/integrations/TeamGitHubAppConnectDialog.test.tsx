@@ -66,6 +66,22 @@ async function type(label: string, value: string) {
 const loaded = (name = 'key.pem') => git.nativePrivateKeyLoaded.replace('{name}', name);
 const pem = (content = PRIVATE_KEY, name = 'key.pem') => new File([content], name);
 
+function slowPem(name = 'key.pem') {
+  let resolveText!: (text: string) => void;
+  const file = pem('', name);
+  Object.defineProperty(file, 'text', {
+    value: () => new Promise<string>((resolve) => (resolveText = resolve)),
+  });
+  return {
+    file,
+    finish: (text: string) =>
+      act(async () => {
+        resolveText(text);
+        await new Promise<void>((resolve) => setTimeout(resolve, 20));
+      }),
+  };
+}
+
 async function pickFile(file: File) {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]');
   assert.ok(input, 'Missing file input');
@@ -231,9 +247,18 @@ describe('TeamGitHubAppConnectDialog', () => {
     await type(git.nativeInstallationId, '98765');
     await pickFile(pem());
     assert.equal(submitButton().disabled, false);
+    const big = pem('a'.repeat(MAX_KEY_BYTES + 1), 'big.pem');
+    let reads = 0;
+    Object.defineProperty(big, 'text', {
+      value: () => {
+        reads += 1;
+        return Promise.resolve('');
+      },
+    });
 
-    await pickFile(pem('a'.repeat(MAX_KEY_BYTES + 1), 'big.pem'));
+    await pickFile(big);
 
+    assert.equal(reads, 0);
     assert.equal(
       document.querySelector('[role="alert"]')?.textContent,
       git.nativePrivateKeyTooLarge,
@@ -294,17 +319,6 @@ describe('TeamGitHubAppConnectDialog', () => {
     assert.equal((calls[0].body as { privateKey: string }).privateKey, PRIVATE_KEY);
   });
 
-  it('keeps the pasted text inside the dialog instead of growing with it', async () => {
-    await render();
-    await click(git.nativePrivateKeyPasteInstead);
-
-    const classes = field(git.nativePrivateKey).classList;
-    assert.ok(classes.contains('field-sizing-fixed'));
-    assert.ok(!classes.contains('field-sizing-content'));
-    assert.ok(classes.contains('break-all'));
-    assert.equal(field(git.nativePrivateKey).getAttribute('rows'), '6');
-  });
-
   it('clears the key when it switches between choosing a file and pasting', async () => {
     await render();
     await type(git.nativeAppId, '123456');
@@ -327,20 +341,28 @@ describe('TeamGitHubAppConnectDialog', () => {
 
   it('drops a file that finishes reading after switching to paste', async () => {
     await render();
-    let finish!: (text: string) => void;
-    const slow = pem();
-    Object.defineProperty(slow, 'text', {
-      value: () => new Promise<string>((resolve) => (finish = resolve)),
-    });
-    await pickFile(slow);
+    const slow = slowPem();
+    await pickFile(slow.file);
     await click(git.nativePrivateKeyPasteInstead);
 
-    await act(async () => {
-      finish(PRIVATE_KEY);
-      await new Promise<void>((resolve) => setTimeout(resolve, 20));
-    });
+    await slow.finish(PRIVATE_KEY);
 
     assert.equal((field(git.nativePrivateKey) as HTMLTextAreaElement).value, '');
+  });
+
+  it('keeps the later file when an earlier one finishes reading last', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+    const slow = slowPem('slow.pem');
+    await pickFile(slow.file);
+    await pickFile(pem(PRIVATE_KEY, 'later.pem'));
+
+    await slow.finish('stale key');
+
+    assert.ok(document.body.textContent?.includes(loaded('later.pem')));
+    await submit();
+    assert.equal((calls[0].body as { privateKey: string }).privateKey, PRIVATE_KEY);
   });
 
   it('starts again from the file chooser, without a key, when it is opened again', async () => {

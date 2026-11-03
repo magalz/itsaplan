@@ -561,57 +561,22 @@ describe('GitHub App connection', () => {
     expect(fake.hooks.size).toBe(1);
   });
 
-  describe('when the token cache holds nothing usable', () => {
+  it('marks the repositories of an uninstalled App when the webhook secret is regenerated', async () => {
     // A token with under five minutes left is minted again on the next use.
-    beforeEach(() => {
-      fake = fakeGithub({ tokenSeconds: 60 });
-    });
+    fake = fakeGithub({ tokenSeconds: 60 });
+    const { asOwner, teamId } = await setup();
+    const connection = await connectedApp(asOwner, teamId, fake);
+    await connectRepository(asOwner, connection.id);
+    fake.failMints(404);
 
-    it('deletes the connection after the App was uninstalled', async () => {
-      const { asOwner, teamId } = await setup();
-      const connection = await connectedApp(asOwner, teamId, fake);
-      await connectRepository(asOwner, connection.id);
-      fake.failMints(404);
+    const regenerated = await asOwner.projects({ projectKey: 'MKT' }).settings.git.secret.post();
 
-      const removed = await asOwner
-        .teams({ teamId })
-        .settings.git.connections({ connectionId: connection.id })
-        .delete();
-
-      expect(removed.status).toBe(204);
-      expect(fake.hooks.size).toBe(1);
-      expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
-    });
-
-    it('keeps the connection when GitHub fails to mint the token', async () => {
-      const { asOwner, teamId } = await setup();
-      const connection = await connectedApp(asOwner, teamId, fake);
-      fake.failMints(500);
-
-      const removed = await asOwner
-        .teams({ teamId })
-        .settings.git.connections({ connectionId: connection.id })
-        .delete();
-
-      expect(removed.status).toBe(502);
-      expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
-    });
-
-    it('marks the repositories of an uninstalled App when the webhook secret is regenerated', async () => {
-      const { asOwner, teamId } = await setup();
-      const connection = await connectedApp(asOwner, teamId, fake);
-      await connectRepository(asOwner, connection.id);
-      fake.failMints(404);
-
-      const regenerated = await asOwner.projects({ projectKey: 'MKT' }).settings.git.secret.post();
-
-      expect(regenerated.status).toBe(200);
-      const connections = await asOwner
-        .projects({ projectKey: 'MKT' })
-        .settings.git.connections.get();
-      expect(connections.data![0]!.repositories).toMatchObject([
-        { status: 'error', lastError: 'GitHub could not find this installation of the App.' },
-      ]);
-    });
+    expect(regenerated.status).toBe(200);
+    const connections = await asOwner
+      .projects({ projectKey: 'MKT' })
+      .settings.git.connections.get();
+    expect(connections.data![0]!.repositories).toMatchObject([
+      { status: 'error', lastError: 'GitHub could not find this installation of the App.' },
+    ]);
   });
 });

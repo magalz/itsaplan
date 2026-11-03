@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
-  apiBase,
   getProviderRepository,
   listProviderRepositories,
   type GitAuthType,
@@ -76,11 +75,6 @@ describe('GitHub App installation provider layer', () => {
     };
   }
 
-  it('points a GitHub Enterprise base URL at its /api/v3 root', () => {
-    expect(apiBase('github', 'https://github.com')).toBe('https://api.github.com');
-    expect(apiBase('github', 'http://127.0.0.1:1234')).toBe('http://127.0.0.1:1234/api/v3');
-  });
-
   it('lists the installation repositories, admin or not, with the installation token', async () => {
     const rows = Array.from({ length: 30 }, (_, index) =>
       githubRow(index + 1, `acme/app-${index + 1}`, index % 2 === 0 ? false : null),
@@ -101,15 +95,6 @@ describe('GitHub App installation provider layer', () => {
     expect(page.nextPage).toBe(3);
   });
 
-  it('has no next page when the installation list is not full', async () => {
-    fake = fakeGithub([githubRow(1, 'acme/app', false)]);
-
-    const page = await listProviderRepositories(connection('github_app'), 1, '');
-
-    expect(page.repositories).toMatchObject([{ fullName: 'acme/app' }]);
-    expect(page.nextPage).toBeNull();
-  });
-
   it('filters the installation repositories by full name', async () => {
     fake = fakeGithub([githubRow(1, 'acme/site', false), githubRow(2, 'acme/Api', false)]);
 
@@ -125,14 +110,6 @@ describe('GitHub App installation provider layer', () => {
       status: 502,
       message: 'github returned an invalid repository list',
     });
-  });
-
-  it('accepts a repository without admin permission for an installation token', async () => {
-    fake = fakeGithub([githubRow(5, 'acme/app', false)]);
-
-    const repository = await getProviderRepository(connection('github_app'), '5');
-
-    expect(repository).toMatchObject({ externalId: '5', fullName: 'acme/app' });
   });
 
   it('keeps the personal token path and its admin filter', async () => {

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:test';
 import { createVerify, generateKeyPairSync } from 'node:crypto';
-import { HttpError } from '#shared/lib';
 import { githubAppJwt } from '../../github-app';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -50,17 +49,12 @@ describe('githubAppJwt', () => {
       }) as string,
     ],
   ])('rejects %s with a 400', (_name, pem) => {
-    let thrown: unknown;
-    try {
-      githubAppJwt('1', pem);
-    } catch (err) {
-      thrown = err;
-    }
-    expect(thrown).toBeInstanceOf(HttpError);
-    expect(thrown).toMatchObject({
-      status: 400,
-      message: 'privateKey is not a valid PEM private key',
-    });
+    expect(() => githubAppJwt('1', pem)).toThrow(
+      expect.objectContaining({
+        status: 400,
+        message: 'privateKey is not a valid PEM private key',
+      }),
+    );
   });
 
   it.each([1024, 4224])('rejects a %i-bit RSA key with a 400', (bits) => {
@@ -68,17 +62,12 @@ describe('githubAppJwt', () => {
       type: 'pkcs8',
       format: 'pem',
     }) as string;
-    let thrown: unknown;
-    try {
-      githubAppJwt('1', pem);
-    } catch (err) {
-      thrown = err;
-    }
-    expect(thrown).toBeInstanceOf(HttpError);
-    expect(thrown).toMatchObject({
-      status: 400,
-      message: 'privateKey must be a 2048- to 4096-bit RSA key',
-    });
+    expect(() => githubAppJwt('1', pem)).toThrow(
+      expect.objectContaining({
+        status: 400,
+        message: 'privateKey must be a 2048- to 4096-bit RSA key',
+      }),
+    );
   });
 
   it('accepts a 4096-bit RSA key', () => {
