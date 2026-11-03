@@ -36,12 +36,9 @@ function privateKeyObject(privateKey: string): KeyObject {
   return key;
 }
 
-export function githubAppJwt(
-  appId: string,
-  privateKey: string,
-  nowSeconds = Math.floor(Date.now() / 1000),
-): string {
+export function githubAppJwt(appId: string, privateKey: string): string {
   const key = privateKeyObject(privateKey);
+  const nowSeconds = Math.floor(Date.now() / 1000);
   const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const signingInput = `${part({ alg: 'RS256', typ: 'JWT' })}.${part({
     iat: nowSeconds - 60,

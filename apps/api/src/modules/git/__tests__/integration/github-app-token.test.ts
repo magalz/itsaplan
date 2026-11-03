@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { HttpError } from '#shared/lib';
 import { getGithubAppInstallation, githubInstallationToken } from '../../github-app';
 import type { GithubAppCredentials } from '../../github-app';
+import { appKeyPair, isValidAppJwt } from '../helpers';
 
 // A GitHub App served on localhost. The SSRF guard refuses http and loopback hosts under
 // NODE_ENV=test, so each case runs as development. Every fake has its own installation id,
@@ -13,29 +13,8 @@ const APP_ID = '4242';
 let installations = 1000;
 const PREFIX = '/api/v3';
 
-function keyPair() {
-  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  return {
-    privateKey: privateKey.export({ type: 'pkcs1', format: 'pem' }) as string,
-    publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
-  };
-}
-
-const appKeys = keyPair();
-const otherKeys = keyPair();
-
-function validJwt(header: string | null): boolean {
-  const [head, payload, signature] = header?.replace(/^Bearer /, '').split('.') ?? [];
-  if (!head || !payload || !signature) return false;
-  const signed = createVerify('RSA-SHA256')
-    .update(`${head}.${payload}`)
-    .verify(appKeys.publicKey, Buffer.from(signature, 'base64url'));
-  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-    iss?: string;
-    exp?: number;
-  };
-  return signed && claims.iss === APP_ID && (claims.exp ?? 0) > Date.now() / 1000;
-}
+const appKeys = appKeyPair();
+const otherKeys = appKeyPair();
 
 interface FakeOptions {
   installationStatus?: number;
@@ -62,7 +41,7 @@ function fakeGithub(options: FakeOptions = {}) {
         accept: req.headers.get('accept'),
         version: req.headers.get('x-github-api-version'),
       });
-      if (!validJwt(req.headers.get('authorization'))) {
+      if (!isValidAppJwt(req.headers.get('authorization'), APP_ID, appKeys.publicKey)) {
         return Response.json({ message: 'Bad credentials' }, { status: 401 });
       }
       const installation = `/app/installations/${installationId}`;

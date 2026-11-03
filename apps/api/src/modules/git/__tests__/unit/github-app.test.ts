@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:test';
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { HttpError } from '#shared/lib';
 import { githubAppJwt } from '../../github-app';
@@ -6,6 +6,7 @@ import { githubAppJwt } from '../../github-app';
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pkcs1 = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
 const pkcs8 = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+const NOW_SECONDS = 1_700_000_000;
 
 function decode(part: string) {
   return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>;
@@ -19,28 +20,24 @@ function verifies(jwt: string): boolean {
 }
 
 describe('githubAppJwt', () => {
+  beforeEach(() => setSystemTime(new Date(NOW_SECONDS * 1000)));
+  afterEach(() => setSystemTime());
+
   it.each([
     ['PKCS#1', pkcs1],
     ['PKCS#8', pkcs8],
   ])('signs a JWT that the public key verifies from a %s key', (_name, pem) => {
-    expect(verifies(githubAppJwt('12345', pem, 1_700_000_000))).toBe(true);
+    expect(verifies(githubAppJwt('12345', pem))).toBe(true);
   });
 
   it('sets the header, issuer and a ten minute window starting a minute ago', () => {
-    const [header, payload] = githubAppJwt('Iv1.abc', pkcs1, 1_700_000_000).split('.');
+    const [header, payload] = githubAppJwt('Iv1.abc', pkcs1).split('.');
     expect(decode(header!)).toEqual({ alg: 'RS256', typ: 'JWT' });
     expect(decode(payload!)).toEqual({
-      iat: 1_700_000_000 - 60,
-      exp: 1_700_000_000 + 540,
+      iat: NOW_SECONDS - 60,
+      exp: NOW_SECONDS + 540,
       iss: 'Iv1.abc',
     });
-  });
-
-  it('reads the clock when no time is given', () => {
-    const before = Math.floor(Date.now() / 1000);
-    const payload = decode(githubAppJwt('1', pkcs1).split('.')[1]!);
-    expect(payload.iat).toBeGreaterThanOrEqual(before - 60);
-    expect(payload.iat).toBeLessThanOrEqual(before - 60 + 5);
   });
 
   it.each([

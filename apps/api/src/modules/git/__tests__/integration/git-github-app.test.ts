@@ -1,10 +1,11 @@
-import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { app } from '../../../../app';
 import { authedApi, createProject, type Api } from '#tests/helpers/app';
 import { signUpTestUser } from '#tests/helpers/auth';
 import { resetDb } from '#tests/helpers/db';
 import { addProjectMember } from '#tests/helpers/members';
+import { appKeyPair, isValidAppJwt } from '../helpers';
 
 // A team connects GitHub through a GitHub App. The SSRF guard refuses http and loopback
 // hosts under NODE_ENV=test, so each case runs as development against a GitHub served on
@@ -15,26 +16,7 @@ const APP_ID = '4242';
 const PREFIX = '/api/v3';
 let installations = 3000;
 
-const keys = (() => {
-  const pair = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  return {
-    privateKey: pair.privateKey.export({ type: 'pkcs1', format: 'pem' }) as string,
-    publicKey: pair.publicKey.export({ type: 'spki', format: 'pem' }) as string,
-  };
-})();
-
-function validJwt(header: string | null): boolean {
-  const [head, payload, signature] = header?.replace(/^Bearer /, '').split('.') ?? [];
-  if (!head || !payload || !signature) return false;
-  const signed = createVerify('RSA-SHA256')
-    .update(`${head}.${payload}`)
-    .verify(keys.publicKey, Buffer.from(signature, 'base64url'));
-  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-    iss?: string;
-    exp?: number;
-  };
-  return signed && claims.iss === APP_ID && (claims.exp ?? 0) > Date.now() / 1000;
-}
+const keys = appKeyPair();
 
 interface Hook {
   id: number;
@@ -74,7 +56,7 @@ function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
       const path = new URL(req.url).pathname.slice(PREFIX.length);
       const authorization = req.headers.get('authorization');
       if (path.startsWith('/app/')) {
-        if (!validJwt(authorization)) {
+        if (!isValidAppJwt(authorization, APP_ID, keys.publicKey)) {
           return Response.json({ message: 'Bad credentials' }, { status: 401 });
         }
         const installation = `/app/installations/${installationId}`;

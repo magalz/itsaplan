@@ -949,7 +949,8 @@ export const integrationCredential = pgTable(
   (t) => [index('integration_credential_team_idx').on(t.teamId)],
 );
 
-// ciphertext: the token, or the App's PEM private key (auth_type 'github_app'); account_login: the account the App is installed on.
+// ciphertext: the token, or the App's PEM private key (auth_type 'github_app').
+// account_login: the account the App is installed on.
 export const gitProviderConnection = pgTable(
   'git_provider_connection',
   {

@@ -370,12 +370,9 @@ export async function listProviderRepositories(
     params.set('limit', String(perPage));
     if (search) params.set('q', search);
   }
-  const endpoint =
-    input.provider === 'gitlab'
-      ? '/projects'
-      : installation
-        ? '/installation/repositories'
-        : '/user/repos';
+  let endpoint = '/user/repos';
+  if (input.provider === 'gitlab') endpoint = '/projects';
+  else if (installation) endpoint = '/installation/repositories';
   const response = await providerRequest(input, `${endpoint}?${params}`);
   const responseBody: unknown = await response.json();
   const body = installation ? record(responseBody)?.repositories : responseBody;
