@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { app } from '../../../../app';
 import { authedApi, createProject, type Api } from '#tests/helpers/app';
@@ -361,6 +361,34 @@ describe('GitHub App connection', () => {
       error: 'privateKey is not a valid PEM private key',
     });
     expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
+  });
+
+  it('refuses an RSA private key of an unsupported size', async () => {
+    fake = fakeGithub();
+    const { asOwner, teamId } = await setup();
+    const small = generateKeyPairSync('rsa', { modulusLength: 1024 }).privateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }) as string;
+
+    const response = await connectApp(asOwner, teamId, fake, { privateKey: small });
+
+    expect(response.status).toBe(400);
+    expect(response.error?.value).toMatchObject({
+      error: 'privateKey must be a 2048- to 4096-bit RSA key',
+    });
+    expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
+  });
+
+  it('refuses a private key longer than 8192 characters', async () => {
+    fake = fakeGithub();
+    const { asOwner, teamId } = await setup();
+
+    const response = await connectApp(asOwner, teamId, fake, { privateKey: 'x'.repeat(8193) });
+
+    expect(response.status).toBe(400);
+    expect(response.error?.value).toMatchObject({ error: expect.stringMatching(/length/i) });
+    expect(fake.mints()).toBe(0);
   });
 
   it('refuses an installation GitHub does not know', async () => {

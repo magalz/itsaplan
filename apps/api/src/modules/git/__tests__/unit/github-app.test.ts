@@ -62,4 +62,30 @@ describe('githubAppJwt', () => {
       message: 'privateKey is not a valid PEM private key',
     });
   });
+
+  it.each([1024, 4224])('rejects a %i-bit RSA key with a 400', (bits) => {
+    const pem = generateKeyPairSync('rsa', { modulusLength: bits }).privateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }) as string;
+    let thrown: unknown;
+    try {
+      githubAppJwt('1', pem);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(HttpError);
+    expect(thrown).toMatchObject({
+      status: 400,
+      message: 'privateKey must be a 2048- to 4096-bit RSA key',
+    });
+  });
+
+  it('accepts a 4096-bit RSA key', () => {
+    const pem = generateKeyPairSync('rsa', { modulusLength: 4096 }).privateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }) as string;
+    expect(githubAppJwt('1', pem).split('.')).toHaveLength(3);
+  });
 });
