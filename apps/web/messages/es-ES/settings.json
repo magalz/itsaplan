@@ -459,7 +459,7 @@
     "nativePrivateKeyFileInstead": "Elegir un archivo en su lugar",
     "nativePrivateKeyTooLarge": "Este archivo es demasiado grande para ser una clave privada.",
     "nativePrivateKeyUnreadable": "No se pudo leer este archivo.",
-    "nativePrivateKeyFileHint": "Elige el archivo .pem que GitHub descargó al generar la clave y después bórralo de tu ordenador. La clave se cifra en reposo y la API nunca la devuelve.",
+    "nativePrivateKeyFileHint": "Elige el archivo .pem que descargaste de GitHub al generar la clave y después bórralo de tu ordenador. La clave se cifra en reposo y la API nunca la devuelve.",
     "nativePrivateKeyPasteHint": "Pega la clave completa, incluidas las líneas BEGIN y END. La clave se cifra en reposo y la API nunca la devuelve.",
     "nativeCancel": "Cancelar",
     "nativeConnect": "Conectar",

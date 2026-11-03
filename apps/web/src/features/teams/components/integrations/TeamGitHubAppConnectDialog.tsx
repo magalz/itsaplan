@@ -89,7 +89,6 @@ export default function TeamGitHubAppConnectDialog({
             <p className="text-xs text-muted-foreground">{t('nativeInstallationIdHint')}</p>
           </div>
           <TeamGitHubAppKeyField
-            key={String(open)}
             id="github-app-key"
             value={privateKey}
             onChange={(key) => setForm((current) => ({ ...current, privateKey: key }))}

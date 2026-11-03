@@ -459,7 +459,7 @@
     "nativePrivateKeyFileInstead": "Choose a file instead",
     "nativePrivateKeyTooLarge": "This file is too large to be a private key.",
     "nativePrivateKeyUnreadable": "This file could not be read.",
-    "nativePrivateKeyFileHint": "Choose the .pem file GitHub downloaded when you generated the key, then delete it from your computer. The key is encrypted at rest and is never returned by the API.",
+    "nativePrivateKeyFileHint": "Choose the .pem file you downloaded from GitHub when you generated the key, then delete it from your computer. The key is encrypted at rest and is never returned by the API.",
     "nativePrivateKeyPasteHint": "Paste the whole key, including the BEGIN and END lines. The key is encrypted at rest and is never returned by the API.",
     "nativeCancel": "Cancel",
     "nativeConnect": "Connect",

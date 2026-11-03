@@ -459,7 +459,7 @@
     "nativePrivateKeyFileInstead": "Bunun yerine dosya seç",
     "nativePrivateKeyTooLarge": "Bu dosya özel anahtar olamayacak kadar büyük.",
     "nativePrivateKeyUnreadable": "Bu dosya okunamadı.",
-    "nativePrivateKeyFileHint": "Anahtarı oluşturduğunuzda GitHub'ın indirdiği .pem dosyasını seçin, ardından bilgisayarınızdan silin. Anahtar şifrelenmiş olarak saklanır ve API tarafından hiçbir zaman döndürülmez.",
+    "nativePrivateKeyFileHint": "Anahtarı oluşturduğunuzda GitHub'dan indirdiğiniz .pem dosyasını seçin, ardından bilgisayarınızdan silin. Anahtar şifrelenmiş olarak saklanır ve API tarafından hiçbir zaman döndürülmez.",
     "nativePrivateKeyPasteHint": "BEGIN ve END satırları dahil anahtarın tamamını yapıştırın. Anahtar şifrelenmiş olarak saklanır ve API tarafından hiçbir zaman döndürülmez.",
     "nativeCancel": "İptal",
     "nativeConnect": "Bağla",

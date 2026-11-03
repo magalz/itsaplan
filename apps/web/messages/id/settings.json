@@ -459,7 +459,7 @@
     "nativePrivateKeyFileInstead": "Pilih file saja",
     "nativePrivateKeyTooLarge": "File ini terlalu besar untuk menjadi kunci privat.",
     "nativePrivateKeyUnreadable": "File ini tidak dapat dibaca.",
-    "nativePrivateKeyFileHint": "Pilih file .pem yang diunduh GitHub saat Anda membuat kunci, lalu hapus dari komputer Anda. Kunci dienkripsi saat disimpan dan tidak pernah dikembalikan oleh API.",
+    "nativePrivateKeyFileHint": "Pilih file .pem yang Anda unduh dari GitHub saat membuat kunci, lalu hapus dari komputer Anda. Kunci dienkripsi saat disimpan dan tidak pernah dikembalikan oleh API.",
     "nativePrivateKeyPasteHint": "Tempel seluruh kunci, termasuk baris BEGIN dan END. Kunci dienkripsi saat disimpan dan tidak pernah dikembalikan oleh API.",
     "nativeCancel": "Batal",
     "nativeConnect": "Hubungkan",

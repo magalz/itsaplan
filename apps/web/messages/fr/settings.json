@@ -459,7 +459,7 @@
     "nativePrivateKeyFileInstead": "Choisir un fichier à la place",
     "nativePrivateKeyTooLarge": "Ce fichier est trop volumineux pour être une clé privée.",
     "nativePrivateKeyUnreadable": "Ce fichier n'a pas pu être lu.",
-    "nativePrivateKeyFileHint": "Choisissez le fichier .pem téléchargé par GitHub lors de la génération de la clé, puis supprimez-le de votre ordinateur. La clé est chiffrée au repos et n'est jamais renvoyée par l'API.",
+    "nativePrivateKeyFileHint": "Choisissez le fichier .pem que vous avez téléchargé depuis GitHub lors de la génération de la clé, puis supprimez-le de votre ordinateur. La clé est chiffrée au repos et n'est jamais renvoyée par l'API.",
     "nativePrivateKeyPasteHint": "Collez la clé entière, y compris les lignes BEGIN et END. La clé est chiffrée au repos et n'est jamais renvoyée par l'API.",
     "nativeCancel": "Annuler",
     "nativeConnect": "Connecter",

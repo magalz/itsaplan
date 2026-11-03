@@ -6,8 +6,8 @@ the pull requests, webhooks and comments that Plan creates are made by the App's
 person leaves the organization.
 
 Plan signs a short-lived JWT with the App's private key and exchanges it for an installation
-access token, which GitHub makes valid for one hour. Plan requests a new one when less than
-five minutes remain. The private key is stored encrypted and is never returned by the API.
+access token, which GitHub makes valid for one hour. The private key is stored encrypted and is
+never returned by the API.
 
 This works with github.com and with GitHub Enterprise Server.
 
@@ -32,7 +32,7 @@ This works with github.com and with GitHub Enterprise Server.
    other accounts need it too.
 6. Click **Create GitHub App**. Note the **App ID** (or the **Client ID**; either works) at the
    top of the App's page.
-7. Under **Private keys**, click **Generate a private key**. GitHub downloads a `.pem` file.
+7. Under **Private keys**, click **Generate a private key**. Your browser downloads a `.pem` file.
    Plan accepts RSA keys of 2048 to 4096 bits; the key GitHub generates is 2048 bits.
 
 ## Install the App
@@ -50,9 +50,9 @@ This works with github.com and with GitHub Enterprise Server.
 2. Leave the provider URL as `https://github.com`, or enter the address of your GitHub
    Enterprise Server.
 3. Enter the App ID (or Client ID) and the Installation ID, then click **Choose .pem file** and
-   select the file GitHub downloaded. Plan shows only the file name, never the key. If you keep
-   the key in a password manager instead, click **Paste the key instead** and paste the whole
-   content of the key, including the `BEGIN` and `END` lines.
+   select the file you downloaded from GitHub. Plan shows only the file name, never the key. If
+   you keep the key in a password manager instead, click **Paste the key instead** and paste the
+   whole content of the key, including the `BEGIN` and `END` lines.
 4. Click **Connect**. Plan checks the key and the installation with GitHub before it saves
    anything.
 5. Delete the `.pem` file from your computer. Plan keeps the key encrypted and never returns it.

@@ -73,14 +73,7 @@ export default function TeamGitHubAppKeyField({
         />
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".pem"
-            tabIndex={-1}
-            className="hidden"
-            onChange={pick}
-          />
+          <input ref={fileInput} type="file" accept=".pem" className="hidden" onChange={pick} />
           <Button
             id={id}
             type="button"
@@ -92,7 +85,7 @@ export default function TeamGitHubAppKeyField({
             {t('nativePrivateKeyChooseFile')}
           </Button>
           {fileName && (
-            <p className="text-xs break-all text-muted-foreground">
+            <p role="status" className="text-xs break-all text-muted-foreground">
               {t('nativePrivateKeyLoaded', { name: fileName })}
             </p>
           )}
