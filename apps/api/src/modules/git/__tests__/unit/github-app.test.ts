@@ -43,10 +43,19 @@ describe('githubAppJwt', () => {
     expect(payload.iat).toBeLessThanOrEqual(before - 60 + 5);
   });
 
-  it('rejects a key that is not a PEM private key with a 400', () => {
+  it.each([
+    ['garbage', 'not a key'],
+    [
+      'an EC key',
+      generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({
+        type: 'pkcs8',
+        format: 'pem',
+      }) as string,
+    ],
+  ])('rejects %s with a 400', (_name, pem) => {
     let thrown: unknown;
     try {
-      githubAppJwt('1', 'not a key');
+      githubAppJwt('1', pem);
     } catch (err) {
       thrown = err;
     }

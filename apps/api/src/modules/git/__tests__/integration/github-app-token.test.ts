@@ -5,11 +5,12 @@ import { getGithubAppInstallation, githubInstallationToken } from '../../github-
 import type { GithubAppCredentials } from '../../github-app';
 
 // A GitHub App served on localhost. The SSRF guard refuses http and loopback hosts under
-// NODE_ENV=test, so each case runs as development. Every fake has its own port, which is
-// part of the token cache key, so no case sees a token another one minted.
+// NODE_ENV=test, so each case runs as development. Every fake has its own installation id,
+// which is part of the token cache key, so no case sees a token another one minted, even when
+// the system hands a freed port to a later fake.
 
 const APP_ID = '4242';
-const INSTALLATION_ID = '777';
+let installations = 1000;
 const PREFIX = '/api/v3';
 
 function keyPair() {
@@ -47,6 +48,7 @@ interface FakeOptions {
 function fakeGithub(options: FakeOptions = {}) {
   const seen: { method: string; path: string; accept: string | null; version: string | null }[] =
     [];
+  const installationId = String(++installations);
   const expiresIn = [...(options.expiresIn ?? [])];
   let mints = 0;
 
@@ -63,12 +65,14 @@ function fakeGithub(options: FakeOptions = {}) {
       if (!validJwt(req.headers.get('authorization'))) {
         return Response.json({ message: 'Bad credentials' }, { status: 401 });
       }
-      const installation = `/app/installations/${INSTALLATION_ID}`;
+      const installation = `/app/installations/${installationId}`;
       if (path === installation && req.method === 'GET') {
         if (options.installationStatus) {
           return Response.json({}, { status: options.installationStatus });
         }
-        return Response.json(options.installationBody ?? { id: 777, account: { login: 'acme' } });
+        return Response.json(
+          options.installationBody ?? { id: Number(installationId), account: { login: 'acme' } },
+        );
       }
       if (path === `${installation}/access_tokens` && req.method === 'POST') {
         mints += 1;
@@ -90,11 +94,12 @@ function fakeGithub(options: FakeOptions = {}) {
   });
   return {
     seen,
+    installationId,
     mints: () => mints,
     app: (overrides: Partial<GithubAppCredentials> = {}): GithubAppCredentials => ({
       apiBase: `http://127.0.0.1:${server.port}${PREFIX}`,
       appId: APP_ID,
-      installationId: INSTALLATION_ID,
+      installationId,
       privateKey: appKeys.privateKey,
       ...overrides,
     }),
@@ -140,7 +145,7 @@ describe('GitHub App credentials', () => {
       expect(github.seen).toEqual([
         {
           method: 'GET',
-          path: `/app/installations/${INSTALLATION_ID}`,
+          path: `/app/installations/${github.installationId}`,
           accept: 'application/vnd.github+json',
           version: '2022-11-28',
         },
@@ -206,7 +211,7 @@ describe('GitHub App credentials', () => {
       expect(github.mints()).toBe(1);
       expect(github.seen[0]).toMatchObject({
         method: 'POST',
-        path: `/app/installations/${INSTALLATION_ID}/access_tokens`,
+        path: `/app/installations/${github.installationId}/access_tokens`,
         accept: 'application/vnd.github+json',
         version: '2022-11-28',
       });
