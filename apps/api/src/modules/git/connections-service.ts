@@ -470,15 +470,19 @@ async function reconcileRepositoryWebhook(
       .set({ webhookExternalId, status: 'connected', lastError: null, updatedAt: new Date() })
       .where(eq(gitManagedRepository.id, repository.id));
   } catch (error) {
-    await db
-      .update(gitManagedRepository)
-      .set({
-        status: 'error',
-        lastError: error instanceof Error ? error.message : 'Webhook update failed',
-        updatedAt: new Date(),
-      })
-      .where(eq(gitManagedRepository.id, repository.id));
+    await markRepositoryFailed(repository.id, error);
   }
+}
+
+async function markRepositoryFailed(repositoryId: number, error: unknown): Promise<void> {
+  await db
+    .update(gitManagedRepository)
+    .set({
+      status: 'error',
+      lastError: error instanceof Error ? error.message : 'Webhook update failed',
+      updatedAt: new Date(),
+    })
+    .where(eq(gitManagedRepository.id, repositoryId));
 }
 
 export async function listAvailableRepositories(
@@ -631,7 +635,6 @@ export async function reconcileManagedWebhooks(
 ): Promise<void> {
   const connections = await listGitProviderConnections(projectId);
   for (const item of connections) {
-    const input = await connectionInputForProject(item.id, projectId);
     const repositories = await db
       .select()
       .from(gitManagedRepository)
@@ -641,6 +644,15 @@ export async function reconcileManagedWebhooks(
           eq(gitManagedRepository.connectionId, item.id),
         ),
       );
+    let input: ProviderConnectionInput;
+    try {
+      input = await connectionInputForProject(item.id, projectId);
+    } catch (error) {
+      // The new secret is already stored: a connection whose credentials are refused
+      // must not leave the webhooks of the connections after it on the old one.
+      for (const repository of repositories) await markRepositoryFailed(repository.id, error);
+      continue;
+    }
     for (const repository of repositories) {
       await reconcileRepositoryWebhook(input, repository, settings);
     }

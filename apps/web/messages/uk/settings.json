@@ -448,7 +448,7 @@
     "nativeAccessToken": "Токен доступу",
     "nativeTokenStored": "Токен зберігається в зашифрованому вигляді й ніколи не повертається через API.",
     "nativeGithubApp": "GitHub App",
-    "nativeGithubAppHint": "Створіть GitHub App з такими правами на репозиторії: Metadata read, Contents read, Pull requests read і write, Webhooks read і write. Actions read необов’язково, він показує статус CI. Установіть App у репозиторії, які потрібно підключити. Pull requests, коментарі й вебхуки після цього створює App, а не людина.",
+    "nativeGithubAppHint": "Створіть GitHub App з такими правами на репозиторії: Metadata (читання), Contents (читання), Pull requests (читання і запис), Webhooks (читання і запис). Actions (читання) необов’язково, він показує статус CI. Установіть App у репозиторії, які потрібно підключити. Pull requests, коментарі й вебхуки після цього створює App, а не людина.",
     "nativeAppId": "App ID або Client ID",
     "nativeInstallationId": "Installation ID",
     "nativeInstallationIdHint": "Число в кінці адреси сторінки налаштувань установлення на GitHub.",

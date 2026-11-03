@@ -402,7 +402,9 @@ describe('GitHub App connection', () => {
     const text = await connectApp(asOwner, teamId, fake, { installationId: 'abc' });
 
     expect(spaced.status).toBe(400);
+    expect(spaced.error?.value).toMatchObject({ error: expect.stringMatching(/to match/) });
     expect(text.status).toBe(400);
+    expect(text.error?.value).toMatchObject({ error: expect.stringMatching(/to match/) });
     expect(fake.mints()).toBe(0);
   });
 
@@ -517,6 +519,23 @@ describe('GitHub App connection', () => {
 
       expect(removed.status).toBe(502);
       expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
+    });
+
+    it('marks the repositories of an uninstalled App when the webhook secret is regenerated', async () => {
+      const { asOwner, teamId } = await setup();
+      const connection = await connectedApp(asOwner, teamId, fake);
+      await connectRepository(asOwner, connection.id);
+      fake.failMints(404);
+
+      const regenerated = await asOwner.projects({ projectKey: 'MKT' }).settings.git.secret.post();
+
+      expect(regenerated.status).toBe(200);
+      const connections = await asOwner
+        .projects({ projectKey: 'MKT' })
+        .settings.git.connections.get();
+      expect(connections.data![0]!.repositories).toMatchObject([
+        { status: 'error', lastError: 'GitHub could not find this installation of the App.' },
+      ]);
     });
   });
 });

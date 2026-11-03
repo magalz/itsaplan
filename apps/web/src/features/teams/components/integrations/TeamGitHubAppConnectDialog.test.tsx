@@ -146,6 +146,10 @@ describe('TeamGitHubAppConnectDialog', () => {
     await type(git.nativeInstallationId, '98765');
     assert.equal(submitButton().disabled, false);
 
+    await type(git.nativeAppId, '  ');
+    assert.equal(submitButton().disabled, true);
+    await type(git.nativeAppId, '123456');
+
     await type(git.nativePrivateKey, '  ');
     assert.equal(submitButton().disabled, true);
   });
