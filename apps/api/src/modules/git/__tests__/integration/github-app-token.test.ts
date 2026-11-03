@@ -194,7 +194,7 @@ describe('GitHub App credentials', () => {
 
   describe('githubInstallationToken', () => {
     it('mints a token and reuses it while it stays valid', async () => {
-      const github = serve();
+      const github = serve({ expiresIn: [600] });
       const app = github.app();
       expect(await githubInstallationToken(app)).toBe('ghs_1');
       expect(await githubInstallationToken(app)).toBe('ghs_1');

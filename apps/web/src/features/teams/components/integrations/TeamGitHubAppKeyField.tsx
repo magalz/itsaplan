@@ -84,11 +84,9 @@ export default function TeamGitHubAppKeyField({
           >
             {t('nativePrivateKeyChooseFile')}
           </Button>
-          {fileName && (
-            <p role="status" className="text-xs break-all text-muted-foreground">
-              {t('nativePrivateKeyLoaded', { name: fileName })}
-            </p>
-          )}
+          <p role="status" className="text-xs break-all text-muted-foreground">
+            {fileName && t('nativePrivateKeyLoaded', { name: fileName })}
+          </p>
         </div>
       )}
       {problem && (

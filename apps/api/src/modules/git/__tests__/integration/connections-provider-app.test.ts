@@ -101,6 +101,7 @@ describe('GitHub App installation provider layer', () => {
     const page = await listProviderRepositories(connection('github_app'), 1, 'api');
 
     expect(page.repositories.map((repo) => repo.fullName)).toEqual(['acme/Api']);
+    expect(page.nextPage).toBeNull();
   });
 
   it('rejects an installation response without a repositories array', async () => {
