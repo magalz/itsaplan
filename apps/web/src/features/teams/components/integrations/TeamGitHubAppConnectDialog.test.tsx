@@ -8,11 +8,13 @@ import { JSDOM } from 'jsdom';
 import settings from '../../../../../messages/en/settings.json';
 
 // A GitHub App connection is made from the App's id, an installation id and the App's
-// private key. The dialog sends them to the team's github-app route and closes when the
-// connection exists.
+// private key. The key is chosen from its .pem file, or pasted. The dialog sends them to
+// the team's github-app route and closes when the connection exists.
 
 const git = settings.git;
-const PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n';
+const KEY_BODY = 'MIIEowIBAAKCAQEAsecretkeybody';
+const PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----\n${KEY_BODY}\n-----END RSA PRIVATE KEY-----\n`;
+const MAX_KEY_BYTES = 8192;
 
 let dom: JSDOM;
 let root: Root;
@@ -24,7 +26,7 @@ let openChanges: boolean[];
 
 const wait = (ms = 20) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
-async function render() {
+async function render(open = true) {
   const { default: TeamGitHubAppConnectDialog } = await import('./TeamGitHubAppConnectDialog');
   await act(async () =>
     root.render(
@@ -32,8 +34,8 @@ async function render() {
         <QueryClientProvider client={queryClient}>
           <TeamGitHubAppConnectDialog
             teamId={7}
-            open
-            onOpenChange={(open) => openChanges.push(open)}
+            open={open}
+            onOpenChange={(next) => openChanges.push(next)}
           />
         </QueryClientProvider>
       </NextIntlClientProvider>,
@@ -47,7 +49,8 @@ function field(label: string) {
     (candidate) => candidate.textContent === label,
   );
   assert.ok(element, `Missing label: ${label}`);
-  return document.getElementById(element.htmlFor) as HTMLInputElement | HTMLTextAreaElement;
+  return document.getElementById(element.htmlFor) as
+    HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement;
 }
 
 async function type(label: string, value: string) {
@@ -60,10 +63,38 @@ async function type(label: string, value: string) {
   });
 }
 
+const loaded = (name = 'key.pem') => git.nativePrivateKeyLoaded.replace('{name}', name);
+const pem = (content = PRIVATE_KEY, name = 'key.pem') => new File([content], name);
+
+async function pickFile(file: File) {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+  assert.ok(input, 'Missing file input');
+  await act(async () => {
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  });
+}
+
+async function click(label: string) {
+  const button = [...document.querySelectorAll('button')].find(
+    (element) => element.textContent === label,
+  );
+  assert.ok(button, `Missing button: ${label}`);
+  await act(async () => button.click());
+}
+
 const submitButton = () =>
   [...document.querySelectorAll('button')].find(
     (element) => element.type === 'submit',
   ) as HTMLButtonElement;
+
+async function submit() {
+  await act(async () => {
+    submitButton().click();
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  });
+}
 
 beforeEach(async () => {
   dom = new JSDOM('<div id="root"></div>', {
@@ -123,15 +154,18 @@ afterEach(async () => {
 });
 
 describe('TeamGitHubAppConnectDialog', () => {
-  it('asks for the provider URL, App ID, installation ID and private key', async () => {
+  it('asks for the provider URL, App ID, installation ID and a private key file', async () => {
     await render();
 
     assert.ok(document.body.textContent?.includes(git.nativeGithubAppHint));
     assert.equal(field(git.nativeBaseUrl).value, 'https://github.com');
     assert.ok(field(git.nativeAppId));
     assert.ok(field(git.nativeInstallationId));
-    assert.equal(field(git.nativePrivateKey).tagName, 'TEXTAREA');
-    assert.equal(field(git.nativePrivateKey).getAttribute('dir'), 'ltr');
+    assert.equal(field(git.nativePrivateKey).tagName, 'BUTTON');
+    assert.equal(field(git.nativePrivateKey).textContent, git.nativePrivateKeyChooseFile);
+    assert.equal(document.querySelector('input[type="file"]')?.getAttribute('accept'), '.pem');
+    assert.equal(document.querySelector('textarea'), null);
+    assert.ok(document.body.textContent?.includes(git.nativePrivateKeyFileHint));
   });
 
   it('keeps Connect disabled until the App ID, installation ID and key are filled in', async () => {
@@ -140,7 +174,7 @@ describe('TeamGitHubAppConnectDialog', () => {
 
     await type(git.nativeAppId, '123456');
     await type(git.nativeInstallationId, '   ');
-    await type(git.nativePrivateKey, PRIVATE_KEY);
+    await pickFile(pem());
     assert.equal(submitButton().disabled, true);
 
     await type(git.nativeInstallationId, '98765');
@@ -150,20 +184,17 @@ describe('TeamGitHubAppConnectDialog', () => {
     assert.equal(submitButton().disabled, true);
     await type(git.nativeAppId, '123456');
 
-    await type(git.nativePrivateKey, '  ');
+    await pickFile(pem('  '));
     assert.equal(submitButton().disabled, true);
   });
 
-  it("connects through the team's github-app route and closes the dialog", async () => {
+  it("connects through the team's github-app route with the chosen file's content", async () => {
     await render();
     await type(git.nativeAppId, ' 123456 ');
     await type(git.nativeInstallationId, ' 98765 ');
-    await type(git.nativePrivateKey, PRIVATE_KEY);
+    await pickFile(pem());
 
-    await act(async () => {
-      submitButton().click();
-      await new Promise<void>((resolve) => setTimeout(resolve, 20));
-    });
+    await submit();
 
     assert.deepEqual(calls, [
       {
@@ -178,5 +209,135 @@ describe('TeamGitHubAppConnectDialog', () => {
       },
     ]);
     assert.deepEqual(openChanges, [false]);
+  });
+
+  it('shows the name of the chosen file and never its content', async () => {
+    await render();
+    await pickFile(pem(PRIVATE_KEY, 'my-app.private-key.pem'));
+
+    assert.ok(
+      document.body.textContent?.includes(
+        git.nativePrivateKeyLoaded.replace('{name}', 'my-app.private-key.pem'),
+      ),
+    );
+    assert.equal(document.querySelector('textarea'), null);
+    assert.ok(!document.body.textContent?.includes(KEY_BODY));
+    assert.ok(!document.body.innerHTML.includes(KEY_BODY));
+  });
+
+  it('refuses a file too large to be a key without keeping the key of an earlier file', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+    await pickFile(pem());
+    assert.equal(submitButton().disabled, false);
+
+    await pickFile(pem('a'.repeat(MAX_KEY_BYTES + 1), 'big.pem'));
+
+    assert.equal(
+      document.querySelector('[role="alert"]')?.textContent,
+      git.nativePrivateKeyTooLarge,
+    );
+    assert.ok(!document.body.textContent?.includes(loaded()));
+    assert.equal(submitButton().disabled, true);
+  });
+
+  it('accepts a file of exactly the largest size and clears an earlier error', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+    await pickFile(pem('a'.repeat(MAX_KEY_BYTES + 1), 'big.pem'));
+    assert.ok(document.querySelector('[role="alert"]'));
+
+    await pickFile(pem('a'.repeat(MAX_KEY_BYTES)));
+
+    assert.equal(document.querySelector('[role="alert"]'), null);
+    assert.equal(submitButton().disabled, false);
+  });
+
+  it('says so when the file cannot be read', async () => {
+    await render();
+    const unreadable = pem();
+    Object.defineProperty(unreadable, 'text', {
+      value: () => Promise.reject(new Error('denied')),
+    });
+
+    await pickFile(unreadable);
+
+    assert.equal(
+      document.querySelector('[role="alert"]')?.textContent,
+      git.nativePrivateKeyUnreadable,
+    );
+    assert.equal(submitButton().disabled, true);
+  });
+
+  it('offers a text area to paste the key and sends what was pasted', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+
+    await click(git.nativePrivateKeyPasteInstead);
+
+    assert.equal(document.querySelector('input[type="file"]'), null);
+    assert.equal(field(git.nativePrivateKey).tagName, 'TEXTAREA');
+    assert.equal(field(git.nativePrivateKey).getAttribute('dir'), 'ltr');
+    assert.ok(document.body.textContent?.includes(git.nativePrivateKeyPasteHint));
+    assert.equal(submitButton().disabled, true);
+
+    await type(git.nativePrivateKey, PRIVATE_KEY);
+    assert.equal(submitButton().disabled, false);
+    await type(git.nativePrivateKey, '  ');
+    assert.equal(submitButton().disabled, true);
+    await type(git.nativePrivateKey, PRIVATE_KEY);
+    await submit();
+
+    assert.equal((calls[0].body as { privateKey: string }).privateKey, PRIVATE_KEY);
+  });
+
+  it('keeps the pasted text inside the dialog instead of growing with it', async () => {
+    await render();
+    await click(git.nativePrivateKeyPasteInstead);
+
+    const classes = field(git.nativePrivateKey).classList;
+    assert.ok(classes.contains('field-sizing-fixed'));
+    assert.ok(!classes.contains('field-sizing-content'));
+    assert.ok(classes.contains('break-all'));
+    assert.equal(field(git.nativePrivateKey).getAttribute('rows'), '6');
+  });
+
+  it('clears the key when it switches between choosing a file and pasting', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+    await pickFile(pem());
+    assert.equal(submitButton().disabled, false);
+
+    await click(git.nativePrivateKeyPasteInstead);
+    assert.equal((field(git.nativePrivateKey) as HTMLTextAreaElement).value, '');
+    assert.equal(submitButton().disabled, true);
+
+    await type(git.nativePrivateKey, PRIVATE_KEY);
+    assert.equal(submitButton().disabled, false);
+
+    await click(git.nativePrivateKeyFileInstead);
+    assert.equal(field(git.nativePrivateKey).tagName, 'BUTTON');
+    assert.ok(!document.body.textContent?.includes(loaded()));
+    assert.equal(submitButton().disabled, true);
+  });
+
+  it('starts again from the file chooser, without a key, when it is opened again', async () => {
+    await render();
+    await type(git.nativeAppId, '123456');
+    await type(git.nativeInstallationId, '98765');
+    await pickFile(pem());
+    await click(git.nativePrivateKeyPasteInstead);
+    await type(git.nativePrivateKey, PRIVATE_KEY);
+
+    await render(false);
+    await render(true);
+
+    assert.equal(field(git.nativePrivateKey).tagName, 'BUTTON');
+    assert.ok(!document.body.textContent?.includes(loaded()));
+    assert.equal(submitButton().disabled, true);
   });
 });
