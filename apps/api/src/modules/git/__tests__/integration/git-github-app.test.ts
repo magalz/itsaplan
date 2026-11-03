@@ -60,6 +60,7 @@ function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
   let nextHookId = 1;
   let mints = 0;
   let mintStatus: number | null = null;
+  let revoked = false;
 
   const showHook = (hook: Hook) => ({ id: hook.id, config: { url: hook.url } });
   const readHook = (body: Record<string, unknown>) => {
@@ -91,7 +92,7 @@ function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
         return Response.json({ message: 'Not Found' }, { status: 404 });
       }
       if (path === '/user') return Response.json({ login: 'acme' });
-      if (authorization !== `Bearer ${token}`) {
+      if (revoked || authorization !== `Bearer ${token}`) {
         return Response.json({ message: 'Bad credentials' }, { status: 401 });
       }
       if (path === '/installation/repositories') {
@@ -156,6 +157,9 @@ function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
     mints: () => mints,
     failMints: (status: number) => {
       mintStatus = status;
+    },
+    revokeToken: () => {
+      revoked = true;
     },
     stop: () => server.stop(true),
   };
@@ -459,6 +463,24 @@ describe('GitHub App connection', () => {
 
     expect(removed.status).toBe(204);
     expect(fake.hooks.size).toBe(0);
+    expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
+  });
+
+  it('deletes the connection when GitHub refuses the token the api still has cached', async () => {
+    fake = fakeGithub();
+    const { asOwner, teamId } = await setup();
+    const connection = await connectedApp(asOwner, teamId, fake);
+    await connectRepository(asOwner, connection.id);
+    fake.failMints(404);
+    fake.revokeToken();
+
+    const removed = await asOwner
+      .teams({ teamId })
+      .settings.git.connections({ connectionId: connection.id })
+      .delete();
+
+    expect(removed.status).toBe(204);
+    expect(fake.mints()).toBe(1);
     expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
   });
 
