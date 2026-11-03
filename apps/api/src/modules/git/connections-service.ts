@@ -587,12 +587,13 @@ export async function disconnectRepository(
 
 export async function disconnectGitProvider(teamId: number, connectionId: number): Promise<void> {
   const row = await teamConnectionRow(connectionId, teamId);
-  // GitHub refuses the credentials of an App that was uninstalled or whose key was revoked.
-  // Its webhooks cannot be removed then, and the connection must still be deletable.
+  // GitHub refuses the credentials of an App that was uninstalled or whose key was revoked,
+  // and also a token it issued earlier that the api still has cached. Its webhooks cannot
+  // be removed then, and the connection must still be deletable.
+  const refused = (error: unknown) =>
+    row.authType === 'github_app' && error instanceof HttpError && error.status === 400;
   const input = await connectionInput(row, row.provider).catch((error: unknown) => {
-    if (row.authType === 'github_app' && error instanceof HttpError && error.status === 400) {
-      return null;
-    }
+    if (refused(error)) return null;
     throw error;
   });
   if (input) {
@@ -601,16 +602,20 @@ export async function disconnectGitProvider(teamId: number, connectionId: number
       .from(gitManagedRepository)
       .where(eq(gitManagedRepository.connectionId, connectionId));
     for (const repository of repositories) {
-      await deleteProviderWebhook(
-        input,
-        {
-          externalId: repository.externalId,
-          fullName: repository.fullName,
-          webUrl: repository.webUrl,
-          private: false,
-        },
-        repository.webhookExternalId,
-      );
+      try {
+        await deleteProviderWebhook(
+          input,
+          {
+            externalId: repository.externalId,
+            fullName: repository.fullName,
+            webUrl: repository.webUrl,
+            private: false,
+          },
+          repository.webhookExternalId,
+        );
+      } catch (error) {
+        if (!refused(error)) throw error;
+      }
     }
   }
   await db
