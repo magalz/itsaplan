@@ -33,7 +33,10 @@ const repository = {
   permissions: { admin: false, push: true },
 };
 
-function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
+function fakeGithub({
+  tokenSeconds = 3600,
+  appId = APP_ID,
+}: { tokenSeconds?: number; appId?: string } = {}) {
   const installationId = String(++installations);
   const token = `ghs_${installationId}`;
   const hooks = new Map<number, Hook>();
@@ -56,7 +59,7 @@ function fakeGithub({ tokenSeconds = 3600 }: { tokenSeconds?: number } = {}) {
       const path = new URL(req.url).pathname.slice(PREFIX.length);
       const authorization = req.headers.get('authorization');
       if (path.startsWith('/app/')) {
-        if (!isValidAppJwt(authorization, APP_ID, keys.publicKey)) {
+        if (!isValidAppJwt(authorization, appId, keys.publicKey)) {
           return Response.json({ message: 'Bad credentials' }, { status: 401 });
         }
         const installation = `/app/installations/${installationId}`;
@@ -416,6 +419,16 @@ describe('GitHub App connection', () => {
     expect(text.status).toBe(400);
     expect(text.error?.value).toMatchObject({ error: expect.stringMatching(/to match/) });
     expect(fake.mints()).toBe(0);
+  });
+
+  it('accepts a legacy Client ID with a dot as the App ID', async () => {
+    fake = fakeGithub({ appId: 'Iv1.abc123' });
+    const { asOwner, teamId } = await setup();
+
+    const response = await connectApp(asOwner, teamId, fake, { appId: 'Iv1.abc123' });
+
+    expect(response.status).toBe(201);
+    expect(response.data).toMatchObject({ authType: 'github_app', accountLogin: 'acme' });
   });
 
   it('refuses a member who is neither owner nor manager', async () => {
