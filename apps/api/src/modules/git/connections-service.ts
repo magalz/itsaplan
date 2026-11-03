@@ -2,7 +2,11 @@ import { db, gitManagedRepository, gitProviderConnection, project } from '@repo/
 import { decryptSecret, encryptSecret } from '@repo/crypto';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { HttpError, iso } from '#shared/lib';
-import { getGithubAppInstallation, githubInstallationToken } from './github-app';
+import {
+  GithubAppRefusedError,
+  getGithubAppInstallation,
+  githubInstallationToken,
+} from './github-app';
 import {
   apiBase,
   createProviderPullRequest,
@@ -62,6 +66,7 @@ type ConnectionRow = Pick<
 async function connectionInput<P extends GitProvider>(
   row: ConnectionRow,
   provider: P,
+  { fresh = false }: { fresh?: boolean } = {},
 ): Promise<ProviderConnectionInput & { provider: P }> {
   if (row.authType !== 'github_app') {
     return { provider, baseUrl: row.baseUrl, token: decryptSecret(row), authType: 'token' };
@@ -69,12 +74,15 @@ async function connectionInput<P extends GitProvider>(
   if (provider !== 'github' || !row.appId || !row.installationId) {
     throw new HttpError(500, 'GitHub App connection is incomplete');
   }
-  const token = await githubInstallationToken({
-    apiBase: apiBase('github', row.baseUrl),
-    appId: row.appId,
-    installationId: row.installationId,
-    privateKey: decryptSecret(row),
-  });
+  const token = await githubInstallationToken(
+    {
+      apiBase: apiBase('github', row.baseUrl),
+      appId: row.appId,
+      installationId: row.installationId,
+      privateKey: decryptSecret(row),
+    },
+    { fresh },
+  );
   return { provider, baseUrl: row.baseUrl, token, authType: 'github_app' };
 }
 
@@ -591,35 +599,30 @@ export async function disconnectRepository(
 
 export async function disconnectGitProvider(teamId: number, connectionId: number): Promise<void> {
   const row = await teamConnectionRow(connectionId, teamId);
-  // GitHub refuses the credentials of an App that was uninstalled or whose key was revoked,
-  // and also a token it issued earlier that the api still has cached. Its webhooks cannot
-  // be removed then, and the connection must still be deletable.
-  const refused = (error: unknown) =>
-    row.authType === 'github_app' && error instanceof HttpError && error.status === 400;
-  const input = await connectionInput(row, row.provider).catch((error: unknown) => {
-    if (refused(error)) return null;
-    throw error;
-  });
+  // A fresh mint shows whether GitHub still accepts the App: only a refusal lets the
+  // connection go without removing its webhooks. Any other failure keeps it for a retry.
+  const input = await connectionInput(row, row.provider, { fresh: true }).catch(
+    (error: unknown) => {
+      if (error instanceof GithubAppRefusedError) return null;
+      throw error;
+    },
+  );
   if (input) {
     const repositories = await db
       .select()
       .from(gitManagedRepository)
       .where(eq(gitManagedRepository.connectionId, connectionId));
     for (const repository of repositories) {
-      try {
-        await deleteProviderWebhook(
-          input,
-          {
-            externalId: repository.externalId,
-            fullName: repository.fullName,
-            webUrl: repository.webUrl,
-            private: false,
-          },
-          repository.webhookExternalId,
-        );
-      } catch (error) {
-        if (!refused(error)) throw error;
-      }
+      await deleteProviderWebhook(
+        input,
+        {
+          externalId: repository.externalId,
+          fullName: repository.fullName,
+          webUrl: repository.webUrl,
+          private: false,
+        },
+        repository.webhookExternalId,
+      );
     }
   }
   await db

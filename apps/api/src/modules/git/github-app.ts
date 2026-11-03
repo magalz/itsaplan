@@ -20,6 +20,9 @@ interface CachedToken {
   minted?: MintedToken;
 }
 
+// GitHub answered 401 or 404 on an App route: the credentials or the installation are gone.
+export class GithubAppRefusedError extends HttpError {}
+
 const REFRESH_MARGIN_MS = 5 * 60_000;
 const MIN_KEY_BITS = 2048;
 const MAX_KEY_BITS = 4096;
@@ -78,10 +81,10 @@ async function appRequest(
   }
   if (response.ok) return response;
   if (response.status === 401) {
-    throw new HttpError(400, 'GitHub rejected the App ID or private key.');
+    throw new GithubAppRefusedError(400, 'GitHub rejected the App ID or private key.');
   }
   if (response.status === 404) {
-    throw new HttpError(400, 'GitHub could not find this installation of the App.');
+    throw new GithubAppRefusedError(400, 'GitHub could not find this installation of the App.');
   }
   const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
   const message = typeof body?.message === 'string' ? body.message : '';
@@ -127,12 +130,19 @@ async function mintInstallationToken(app: GithubAppCredentials): Promise<MintedT
   return { token: body.token, expiresAt };
 }
 
-export async function githubInstallationToken(app: GithubAppCredentials): Promise<string> {
+export async function githubInstallationToken(
+  app: GithubAppCredentials,
+  { fresh = false }: { fresh?: boolean } = {},
+): Promise<string> {
   // Hashed into the key so only a caller holding the private key is served a cached token.
   const keyHash = createHash('sha256').update(app.privateKey).digest('hex');
   const key = `${app.apiBase}|${app.appId}|${app.installationId}|${keyHash}`;
   const cached = tokenCache.get(key);
-  if (cached && (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)) {
+  if (
+    !fresh &&
+    cached &&
+    (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)
+  ) {
     return (await cached.promise).token;
   }
   const entry: CachedToken = { promise: mintInstallationToken(app) };
