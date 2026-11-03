@@ -254,6 +254,24 @@ describe('GitHub App credentials', () => {
       expect(github.mints()).toBe(2);
     });
 
+    it('does not hand a cached token to a caller with another private key', async () => {
+      const github = serve();
+      expect(await githubInstallationToken(github.app())).toBe('ghs_1');
+
+      const wrongKey = await rejection(
+        githubInstallationToken(github.app({ privateKey: otherKeys.privateKey })),
+      );
+      expect(wrongKey.status).toBe(400);
+      expect(wrongKey.message).toBe('GitHub rejected the App ID or private key.');
+
+      const garbage = await rejection(
+        githubInstallationToken(github.app({ privateKey: 'not a key' })),
+      );
+      expect(garbage.status).toBe(400);
+      expect(garbage.message).toBe('privateKey is not a valid PEM private key');
+      expect(github.mints()).toBe(1);
+    });
+
     it('answers 502 when the response has no token', async () => {
       const github = serve({ mintBody: { expires_at: '2099-01-01T00:00:00Z' } });
       const error = await rejection(githubInstallationToken(github.app()));
