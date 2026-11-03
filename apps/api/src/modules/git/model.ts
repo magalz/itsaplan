@@ -110,7 +110,7 @@ export const createGitProviderConnectionBody = t.Object({
 
 export const createGithubAppConnectionBody = t.Object({
   baseUrl: t.Optional(t.String({ maxLength: 2048 })),
-  appId: t.String({ minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9]+$' }),
+  appId: t.String({ minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9.]+$' }),
   installationId: t.String({ minLength: 1, maxLength: 20, pattern: '^[0-9]+$' }),
   privateKey: t.String({ minLength: 1, maxLength: 8192 }),
 });
