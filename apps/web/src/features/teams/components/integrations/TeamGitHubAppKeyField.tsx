@@ -19,11 +19,14 @@ export default function TeamGitHubAppKeyField({
 }) {
   const t = useTranslations('settings.git');
   const fileInput = useRef<HTMLInputElement>(null);
+  // Counts file picks and mode switches, so a read that ends after either is dropped.
+  const readSeq = useRef(0);
   const [pasting, setPasting] = useState(false);
   const [fileName, setFileName] = useState('');
   const [problem, setProblem] = useState<KeyProblem>(null);
 
   function switchMode() {
+    readSeq.current += 1;
     setPasting(!pasting);
     setFileName('');
     setProblem(null);
@@ -34,6 +37,7 @@ export default function TeamGitHubAppKeyField({
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    const seq = ++readSeq.current;
     let key = '';
     let failure: KeyProblem = null;
     if (file.size > MAX_KEY_BYTES) failure = 'tooLarge';
@@ -44,6 +48,7 @@ export default function TeamGitHubAppKeyField({
         failure = 'unreadable';
       }
     }
+    if (seq !== readSeq.current) return;
     setProblem(failure);
     setFileName(failure ? '' : file.name);
     onChange(key);

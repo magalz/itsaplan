@@ -325,6 +325,24 @@ describe('TeamGitHubAppConnectDialog', () => {
     assert.equal(submitButton().disabled, true);
   });
 
+  it('drops a file that finishes reading after switching to paste', async () => {
+    await render();
+    let finish!: (text: string) => void;
+    const slow = pem();
+    Object.defineProperty(slow, 'text', {
+      value: () => new Promise<string>((resolve) => (finish = resolve)),
+    });
+    await pickFile(slow);
+    await click(git.nativePrivateKeyPasteInstead);
+
+    await act(async () => {
+      finish(PRIVATE_KEY);
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+
+    assert.equal((field(git.nativePrivateKey) as HTMLTextAreaElement).value, '');
+  });
+
   it('starts again from the file chooser, without a key, when it is opened again', async () => {
     await render();
     await type(git.nativeAppId, '123456');
