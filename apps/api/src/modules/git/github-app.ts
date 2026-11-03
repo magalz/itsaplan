@@ -1,4 +1,4 @@
-import { createPrivateKey, createSign, type KeyObject } from 'node:crypto';
+import { createHash, createPrivateKey, createSign, type KeyObject } from 'node:crypto';
 import { HttpError } from '#shared/lib';
 import { pinnedFetch } from '#shared/net';
 import { providerErrorMessage } from './connections-provider';
@@ -124,7 +124,9 @@ async function mintInstallationToken(app: GithubAppCredentials): Promise<MintedT
 }
 
 export async function githubInstallationToken(app: GithubAppCredentials): Promise<string> {
-  const key = `${app.apiBase}|${app.appId}|${app.installationId}`;
+  // Hashed into the key so only a caller holding the private key is served a cached token.
+  const keyHash = createHash('sha256').update(app.privateKey).digest('hex');
+  const key = `${app.apiBase}|${app.appId}|${app.installationId}|${keyHash}`;
   const cached = tokenCache.get(key);
   if (cached && (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)) {
     return (await cached.promise).token;
