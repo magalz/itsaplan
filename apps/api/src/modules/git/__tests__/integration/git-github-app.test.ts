@@ -45,6 +45,8 @@ function fakeGithub({
   let nextHookId = 1;
   let mints = 0;
   let mintStatus: number | null = null;
+  let mintHeaders: Record<string, string> = {};
+  let hookDeleteStatus: number | null = null;
   let revoked = false;
 
   const showHook = (hook: Hook) => ({ id: hook.id, config: { url: hook.url } });
@@ -68,7 +70,12 @@ function fakeGithub({
         }
         if (path === `${installation}/access_tokens` && req.method === 'POST') {
           mints += 1;
-          if (mintStatus) return Response.json({ message: 'Failed' }, { status: mintStatus });
+          if (mintStatus) {
+            return Response.json(
+              { message: 'Failed' },
+              { status: mintStatus, headers: mintHeaders },
+            );
+          }
           return Response.json(
             { token, expires_at: new Date(Date.now() + tokenSeconds * 1000).toISOString() },
             { status: 201 },
@@ -102,6 +109,9 @@ function fakeGithub({
         return Response.json(showHook(hook));
       }
       if (hook && req.method === 'DELETE') {
+        if (hookDeleteStatus) {
+          return Response.json({ message: 'Forbidden' }, { status: hookDeleteStatus });
+        }
         hooks.delete(hook.id);
         return new Response(null, { status: 204 });
       }
@@ -140,8 +150,12 @@ function fakeGithub({
     pulls,
     comments,
     mints: () => mints,
-    failMints: (status: number) => {
+    failMints: (status: number, headers: Record<string, string> = {}) => {
       mintStatus = status;
+      mintHeaders = headers;
+    },
+    failHookDeletes: (status: number) => {
+      hookDeleteStatus = status;
     },
     revokeToken: () => {
       revoked = true;
@@ -505,8 +519,46 @@ describe('GitHub App connection', () => {
       .delete();
 
     expect(removed.status).toBe(204);
-    expect(fake.mints()).toBe(1);
+    expect(fake.mints()).toBe(2);
+    expect(fake.hooks.size).toBe(1);
     expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
+  });
+
+  it('keeps the connection and its webhooks when GitHub rate-limits the token mint', async () => {
+    fake = fakeGithub();
+    const { asOwner, teamId } = await setup();
+    const connection = await connectedApp(asOwner, teamId, fake);
+    await connectRepository(asOwner, connection.id);
+    fake.failMints(403, { 'x-ratelimit-remaining': '0' });
+
+    const removed = await asOwner
+      .teams({ teamId })
+      .settings.git.connections({ connectionId: connection.id })
+      .delete();
+
+    expect(removed.status).toBe(400);
+    expect(removed.error?.value).toMatchObject({
+      error: 'GitHub API rate limit reached. Wait for it to reset and try again.',
+    });
+    expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
+    expect(fake.hooks.size).toBe(1);
+  });
+
+  it('keeps the connection when GitHub refuses to delete a webhook', async () => {
+    fake = fakeGithub();
+    const { asOwner, teamId } = await setup();
+    const connection = await connectedApp(asOwner, teamId, fake);
+    await connectRepository(asOwner, connection.id);
+    fake.failHookDeletes(403);
+
+    const removed = await asOwner
+      .teams({ teamId })
+      .settings.git.connections({ connectionId: connection.id })
+      .delete();
+
+    expect(removed.status).toBe(400);
+    expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
+    expect(fake.hooks.size).toBe(1);
   });
 
   describe('when the token cache holds nothing usable', () => {
@@ -527,6 +579,7 @@ describe('GitHub App connection', () => {
         .delete();
 
       expect(removed.status).toBe(204);
+      expect(fake.hooks.size).toBe(1);
       expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
     });
 

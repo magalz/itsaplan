@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { HttpError } from '#shared/lib';
-import { getGithubAppInstallation, githubInstallationToken } from '../../github-app';
+import {
+  GithubAppRefusedError,
+  getGithubAppInstallation,
+  githubInstallationToken,
+} from '../../github-app';
 import type { GithubAppCredentials } from '../../github-app';
 import { appKeyPair, isValidAppJwt } from '../helpers';
 
@@ -21,6 +25,7 @@ interface FakeOptions {
   installationBody?: unknown;
   expiresIn?: number[];
   failMints?: number;
+  mintStatus?: number;
   mintBody?: unknown;
 }
 
@@ -57,7 +62,7 @@ function fakeGithub(options: FakeOptions = {}) {
         mints += 1;
         await Bun.sleep(20);
         if (mints <= (options.failMints ?? 0)) {
-          return Response.json({ message: 'Server Error' }, { status: 500 });
+          return Response.json({ message: 'Server Error' }, { status: options.mintStatus ?? 500 });
         }
         const seconds = expiresIn.shift() ?? 3600;
         return Response.json(
@@ -143,6 +148,7 @@ describe('GitHub App credentials', () => {
       const error = await rejection(
         getGithubAppInstallation(github.app({ privateKey: otherKeys.privateKey })),
       );
+      expect(error).toBeInstanceOf(GithubAppRefusedError);
       expect(error.status).toBe(400);
       expect(error.message).toBe('GitHub rejected the App ID or private key.');
     });
@@ -150,6 +156,7 @@ describe('GitHub App credentials', () => {
     it('answers 400 when the installation does not exist', async () => {
       const github = serve();
       const error = await rejection(getGithubAppInstallation(github.app({ installationId: '9' })));
+      expect(error).toBeInstanceOf(GithubAppRefusedError);
       expect(error.status).toBe(400);
       expect(error.message).toBe('GitHub could not find this installation of the App.');
     });
@@ -240,6 +247,7 @@ describe('GitHub App credentials', () => {
       const wrongKey = await rejection(
         githubInstallationToken(github.app({ privateKey: otherKeys.privateKey })),
       );
+      expect(wrongKey).toBeInstanceOf(GithubAppRefusedError);
       expect(wrongKey.status).toBe(400);
       expect(wrongKey.message).toBe('GitHub rejected the App ID or private key.');
 
@@ -270,9 +278,26 @@ describe('GitHub App credentials', () => {
       const error = await rejection(
         githubInstallationToken(github.app({ privateKey: otherKeys.privateKey })),
       );
+      expect(error).toBeInstanceOf(GithubAppRefusedError);
       expect(error.status).toBe(400);
       expect(error.message).toBe('GitHub rejected the App ID or private key.');
       expect(github.mints()).toBe(0);
+    });
+
+    it('does not treat a rate limit as a refusal of the App', async () => {
+      const github = serve({ failMints: 1, mintStatus: 403 });
+      const error = await rejection(githubInstallationToken(github.app()));
+      expect(error.status).toBe(400);
+      expect(error).not.toBeInstanceOf(GithubAppRefusedError);
+    });
+
+    it('mints a new token on request even when a valid one is cached', async () => {
+      const github = serve();
+      const app = github.app();
+      expect(await githubInstallationToken(app)).toBe('ghs_1');
+      expect(await githubInstallationToken(app, { fresh: true })).toBe('ghs_2');
+      expect(await githubInstallationToken(app)).toBe('ghs_2');
+      expect(github.mints()).toBe(2);
     });
   });
 });
