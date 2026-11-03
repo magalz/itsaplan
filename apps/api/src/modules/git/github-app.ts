@@ -21,6 +21,8 @@ interface CachedToken {
 }
 
 const REFRESH_MARGIN_MS = 5 * 60_000;
+const MIN_KEY_BITS = 2048;
+const MAX_KEY_BITS = 4096;
 const tokenCache = new Map<string, CachedToken>();
 
 function privateKeyObject(privateKey: string): KeyObject {
@@ -32,6 +34,11 @@ function privateKeyObject(privateKey: string): KeyObject {
   }
   if (key?.asymmetricKeyType !== 'rsa') {
     throw new HttpError(400, 'privateKey is not a valid PEM private key');
+  }
+  // Signing blocks the event loop and its cost grows steeply with the modulus.
+  const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
+  if (bits < MIN_KEY_BITS || bits > MAX_KEY_BITS) {
+    throw new HttpError(400, 'privateKey must be a 2048- to 4096-bit RSA key');
   }
   return key;
 }
