@@ -284,7 +284,7 @@ describe('GitHub App credentials', () => {
       expect(github.mints()).toBe(0);
     });
 
-    it('does not treat a rate limit as a refusal of the App', async () => {
+    it('does not treat a 403 as a refusal of the App', async () => {
       const github = serve({ failMints: 1, mintStatus: 403 });
       const error = await rejection(githubInstallationToken(github.app()));
       expect(error.status).toBe(400);
