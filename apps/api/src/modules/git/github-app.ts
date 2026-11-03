@@ -41,7 +41,10 @@ function privateKeyObject(privateKey: string): KeyObject {
   // Signing blocks the event loop and its cost grows steeply with the modulus.
   const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
   if (bits < MIN_KEY_BITS || bits > MAX_KEY_BITS) {
-    throw new HttpError(400, 'privateKey must be a 2048- to 4096-bit RSA key');
+    throw new HttpError(
+      400,
+      `privateKey must be a ${MIN_KEY_BITS}- to ${MAX_KEY_BITS}-bit RSA key`,
+    );
   }
   return key;
 }

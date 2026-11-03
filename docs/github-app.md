@@ -33,6 +33,7 @@ This works with github.com and with GitHub Enterprise Server.
 6. Click **Create GitHub App**. Note the **App ID** (or the **Client ID**; either works) at the
    top of the App's page.
 7. Under **Private keys**, click **Generate a private key**. GitHub downloads a `.pem` file.
+   Plan accepts RSA keys of 2048 to 4096 bits; the key GitHub generates is 2048 bits.
 
 ## Install the App
 
@@ -67,4 +68,5 @@ the webhook of each repository you select with the App's token.
 - **Disconnect** removes the webhooks Plan created, then the connection. If the App was
   already uninstalled or its key revoked, Plan cannot reach the repositories any more: it
   removes the connection and leaves the webhooks, which you can delete in each repository's
-  settings.
+  settings. If GitHub fails for another reason, such as a rate limit, Disconnect shows the
+  error and keeps the connection, so you can try again.

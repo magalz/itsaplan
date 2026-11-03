@@ -505,7 +505,7 @@ describe('GitHub App connection', () => {
     expect((await teamConnections(asOwner, teamId)).data).toEqual([]);
   });
 
-  it('deletes the connection when GitHub refuses the token the api still has cached', async () => {
+  it('deletes the connection of an uninstalled App whose revoked token is still cached', async () => {
     fake = fakeGithub();
     const { asOwner, teamId } = await setup();
     const connection = await connectedApp(asOwner, teamId, fake);
