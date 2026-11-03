@@ -349,7 +349,7 @@ export async function listProviderRepositories(
   const perPage = 30;
   if (input.provider === 'bitbucket')
     return listBitbucketRepositories(input, page, search, perPage);
-  const installation = input.provider === 'github' && input.authType === 'github_app';
+  const installation = input.authType === 'github_app';
   const params = new URLSearchParams({ page: String(page) });
   if (input.provider === 'gitlab') {
     params.set('per_page', String(perPage));

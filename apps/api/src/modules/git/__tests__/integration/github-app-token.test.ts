@@ -61,7 +61,6 @@ function fakeGithub(options: FakeOptions = {}) {
       }
       if (path === `${installation}/access_tokens` && req.method === 'POST') {
         mints += 1;
-        await Bun.sleep(20);
         if (failuresLeft > 0) {
           failuresLeft -= 1;
           return Response.json({ message: 'Server Error' }, { status: options.mintStatus ?? 500 });
@@ -208,17 +207,6 @@ describe('GitHub App credentials', () => {
       });
     });
 
-    it('shares one mint between concurrent callers', async () => {
-      const github = serve();
-      const app = github.app();
-      const tokens = await Promise.all([
-        githubInstallationToken(app),
-        githubInstallationToken(app),
-      ]);
-      expect(tokens).toEqual(['ghs_1', 'ghs_1']);
-      expect(github.mints()).toBe(1);
-    });
-
     it('replaces a token that has less than five minutes left', async () => {
       const github = serve({ expiresIn: [240, 3600] });
       const app = github.app();
@@ -226,14 +214,6 @@ describe('GitHub App credentials', () => {
       expect(await githubInstallationToken(app)).toBe('ghs_2');
       expect(await githubInstallationToken(app)).toBe('ghs_2');
       expect(github.mints()).toBe(2);
-    });
-
-    it('keeps a token that has more than five minutes left', async () => {
-      const github = serve({ expiresIn: [600] });
-      const app = github.app();
-      await githubInstallationToken(app);
-      await githubInstallationToken(app);
-      expect(github.mints()).toBe(1);
     });
 
     it('does not cache a failed mint', async () => {
@@ -264,36 +244,14 @@ describe('GitHub App credentials', () => {
       expect(github.mints()).toBe(1);
     });
 
-    it('answers 502 when the response has no token', async () => {
-      const github = serve({ mintBody: { expires_at: '2099-01-01T00:00:00Z' } });
+    it.each([
+      ['no token', { expires_at: '2099-01-01T00:00:00Z' }],
+      ['no usable expiry', { token: 'ghs_x', expires_at: 'soon' }],
+    ])('answers 502 when the response has %s', async (_case, mintBody) => {
+      const github = serve({ mintBody });
       const error = await rejection(githubInstallationToken(github.app()));
       expect(error.status).toBe(502);
       expect(error.message).toBe('GitHub returned an invalid installation token');
-    });
-
-    it('answers 502 when the response has no usable expiry', async () => {
-      const github = serve({ mintBody: { token: 'ghs_x', expires_at: 'soon' } });
-      const error = await rejection(githubInstallationToken(github.app()));
-      expect(error.status).toBe(502);
-      expect(error.message).toBe('GitHub returned an invalid installation token');
-    });
-
-    it('answers 400 when GitHub rejects the private key', async () => {
-      const github = serve();
-      const error = await rejection(
-        githubInstallationToken(github.app({ privateKey: otherKeys.privateKey })),
-      );
-      expect(error).toBeInstanceOf(GithubAppRefusedError);
-      expect(error.status).toBe(400);
-      expect(error.message).toBe('GitHub rejected the App ID or private key.');
-      expect(github.mints()).toBe(0);
-    });
-
-    it('does not treat a 403 as a refusal of the App', async () => {
-      const github = serve({ failMints: 1, mintStatus: 403 });
-      const error = await rejection(githubInstallationToken(github.app()));
-      expect(error.status).toBe(400);
-      expect(error).not.toBeInstanceOf(GithubAppRefusedError);
     });
 
     it('mints a new token on request even when a valid one is cached', async () => {

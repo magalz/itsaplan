@@ -15,18 +15,13 @@ interface MintedToken {
   expiresAt: number;
 }
 
-interface CachedToken {
-  promise: Promise<MintedToken>;
-  minted?: MintedToken;
-}
-
 // GitHub answered 401 or 404 on an App route: the credentials or the installation are gone.
 export class GithubAppRefusedError extends HttpError {}
 
 const REFRESH_MARGIN_MS = 5 * 60_000;
 const MIN_KEY_BITS = 2048;
 const MAX_KEY_BITS = 4096;
-const tokenCache = new Map<string, CachedToken>();
+const tokenCache = new Map<string, MintedToken>();
 
 function privateKeyObject(privateKey: string): KeyObject {
   let key: KeyObject | null;
@@ -140,25 +135,9 @@ export async function githubInstallationToken(
   // Hashed into the key so only a caller holding the private key is served a cached token.
   const keyHash = createHash('sha256').update(app.privateKey).digest('hex');
   const key = `${app.apiBase}|${app.appId}|${app.installationId}|${keyHash}`;
-  if (fresh) {
-    // Cached only once minted, so a failed fresh mint leaves the cached token to other callers.
-    const minted = await mintInstallationToken(app);
-    tokenCache.set(key, { promise: Promise.resolve(minted), minted });
-    return minted.token;
-  }
   const cached = tokenCache.get(key);
-  if (cached && (!cached.minted || cached.minted.expiresAt - Date.now() >= REFRESH_MARGIN_MS)) {
-    return (await cached.promise).token;
-  }
-  const entry: CachedToken = { promise: mintInstallationToken(app) };
-  tokenCache.set(key, entry);
-  entry.promise.then(
-    (minted) => {
-      entry.minted = minted;
-    },
-    () => {
-      if (tokenCache.get(key) === entry) tokenCache.delete(key);
-    },
-  );
-  return (await entry.promise).token;
+  if (!fresh && cached && cached.expiresAt - Date.now() >= REFRESH_MARGIN_MS) return cached.token;
+  const minted = await mintInstallationToken(app);
+  tokenCache.set(key, minted);
+  return minted.token;
 }

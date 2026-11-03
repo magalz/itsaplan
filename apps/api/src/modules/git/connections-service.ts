@@ -71,7 +71,7 @@ async function connectionInput<P extends GitProvider>(
   if (row.authType !== 'github_app') {
     return { provider, baseUrl: row.baseUrl, token: decryptSecret(row), authType: 'token' };
   }
-  if (provider !== 'github' || !row.appId || !row.installationId) {
+  if (!row.appId || !row.installationId) {
     throw new HttpError(500, 'GitHub App connection is incomplete');
   }
   const token = await githubInstallationToken(
@@ -85,6 +85,17 @@ async function connectionInput<P extends GitProvider>(
   );
   return { provider, baseUrl: row.baseUrl, token, authType: 'github_app' };
 }
+
+const connectionColumns = {
+  provider: gitProviderConnection.provider,
+  baseUrl: gitProviderConnection.baseUrl,
+  authType: gitProviderConnection.authType,
+  appId: gitProviderConnection.appId,
+  installationId: gitProviderConnection.installationId,
+  ciphertext: gitProviderConnection.ciphertext,
+  iv: gitProviderConnection.iv,
+  authTag: gitProviderConnection.authTag,
+};
 
 const repositoryColumns = {
   id: gitManagedRepository.id,
@@ -117,14 +128,7 @@ async function managedDevelopmentRepository(
 ): Promise<ManagedDevelopmentRepository> {
   const [row] = await db
     .select({
-      provider: gitProviderConnection.provider,
-      baseUrl: gitProviderConnection.baseUrl,
-      authType: gitProviderConnection.authType,
-      appId: gitProviderConnection.appId,
-      installationId: gitProviderConnection.installationId,
-      ciphertext: gitProviderConnection.ciphertext,
-      iv: gitProviderConnection.iv,
-      authTag: gitProviderConnection.authTag,
+      ...connectionColumns,
       externalId: gitManagedRepository.externalId,
       fullName: gitManagedRepository.fullName,
       webUrl: gitManagedRepository.webUrl,
@@ -671,14 +675,7 @@ export async function postPullRequestLinkback(
 ): Promise<boolean> {
   const [row] = await db
     .select({
-      provider: gitProviderConnection.provider,
-      baseUrl: gitProviderConnection.baseUrl,
-      authType: gitProviderConnection.authType,
-      appId: gitProviderConnection.appId,
-      installationId: gitProviderConnection.installationId,
-      ciphertext: gitProviderConnection.ciphertext,
-      iv: gitProviderConnection.iv,
-      authTag: gitProviderConnection.authTag,
+      ...connectionColumns,
       externalId: gitManagedRepository.externalId,
       fullName: gitManagedRepository.fullName,
       webUrl: gitManagedRepository.webUrl,
