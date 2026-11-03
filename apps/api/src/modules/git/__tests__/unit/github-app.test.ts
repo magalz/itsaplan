@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createPublicKey, createVerify, generateKeyPairSync } from 'node:crypto';
+import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { HttpError } from '#shared/lib';
 import { githubAppJwt } from '../../github-app';
 
@@ -15,7 +15,7 @@ function verifies(jwt: string): boolean {
   const [header, payload, signature] = jwt.split('.');
   return createVerify('RSA-SHA256')
     .update(`${header}.${payload}`)
-    .verify(createPublicKey(publicKey), Buffer.from(signature!, 'base64url'));
+    .verify(publicKey, Buffer.from(signature!, 'base64url'));
 }
 
 describe('githubAppJwt', () => {
