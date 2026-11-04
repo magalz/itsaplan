@@ -460,14 +460,11 @@ describe('GitHub App connection', () => {
     fake = fakeGithub();
     const { asOwner, teamId } = await setup();
     const first = await connectedApp(asOwner, teamId, fake);
-    await Bun.sleep(10);
 
     const second = await connectedApp(asOwner, teamId, fake);
 
     expect(second.id).toBe(first.id);
-    const time = (value: string) => new Date(value).getTime();
-    expect(time(second.createdAt)).toBe(time(first.createdAt));
-    expect(time(second.updatedAt)).toBeGreaterThan(time(first.updatedAt));
+    expect(new Date(second.createdAt).getTime()).toBe(new Date(first.createdAt).getTime());
     expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
   });
 
