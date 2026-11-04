@@ -48,6 +48,7 @@ function fakeGithub({
   let mintHeaders: Record<string, string> = {};
   let hookDeleteStatus: number | null = null;
   let revoked = false;
+  let accountLogin = 'acme';
 
   const showHook = (hook: Hook) => ({ id: hook.id, config: { url: hook.url } });
   const readHook = (body: Record<string, unknown>) => {
@@ -66,7 +67,7 @@ function fakeGithub({
         }
         const installation = `/app/installations/${installationId}`;
         if (path === installation && req.method === 'GET') {
-          return Response.json({ id: Number(installationId), account: { login: 'acme' } });
+          return Response.json({ id: Number(installationId), account: { login: accountLogin } });
         }
         if (path === `${installation}/access_tokens` && req.method === 'POST') {
           mints += 1;
@@ -159,6 +160,9 @@ function fakeGithub({
     },
     revokeToken: () => {
       revoked = true;
+    },
+    renameAccount: (login: string) => {
+      accountLogin = login;
     },
     stop: () => server.stop(true),
   };
@@ -460,10 +464,12 @@ describe('GitHub App connection', () => {
     fake = fakeGithub();
     const { asOwner, teamId } = await setup();
     const first = await connectedApp(asOwner, teamId, fake);
+    fake.renameAccount('acme-renamed');
 
     const second = await connectedApp(asOwner, teamId, fake);
 
     expect(second.id).toBe(first.id);
+    expect(second.accountLogin).toBe('acme-renamed');
     expect(new Date(second.createdAt).getTime()).toBe(new Date(first.createdAt).getTime());
     expect((await teamConnections(asOwner, teamId)).data).toHaveLength(1);
   });
